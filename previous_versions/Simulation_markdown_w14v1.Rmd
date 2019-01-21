@@ -1,0 +1,163 @@
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+title: "Simulation output"
+author: "Remco Benthem de Grave"
+date: `r format(Sys.time(),"%d %B %Y %H:%M")`
+output: html_document
+---
+
+```{r, include = FALSE}
+#set file directory
+mainDir <- "D:/Surfdrive/BS28A - Major project/simulations/simulations"
+if (file.exists(mainDir)){setwd(mainDir)}
+filedir <- choose.dir(default = mainDir)
+```
+
+```{r, include = FALSE}
+#load libraries
+library(ggplot2)
+library(dplyr)
+```
+
+```{r, echo = FALSE}
+#create average cortisol profile since awakening
+settings <- read.csv("settings.csv")
+Qdata <- read.csv("Qdata.csv")
+
+#plot since awakening
+with(Qdata[which(Qdata$time>settings$waketime),], ts.plot(
+  ts(Q05, start = 0, end = (length(Q05)-1)*settings$dt, frequency = 1/settings$dt),
+  ts(Q25, start = 0, end = (length(Q25)-1)*settings$dt, frequency = 1/settings$dt),
+  ts(Q50, start = 0, end = (length(Q50)-1)*settings$dt, frequency = 1/settings$dt),
+  ts(Q75, start = 0, end = (length(Q75)-1)*settings$dt, frequency = 1/settings$dt),
+  ts(Q95, start = 0, end = (length(Q95)-1)*settings$dt, frequency = 1/settings$dt),
+  xlab=('hours since awakening'),ylab=('cortisol'),main=(paste('simulated DAY cortisol profiles of',people,'people'))
+))
+
+#plot since day start to 3 hours after awakening
+with(Qdata[which(Qdata$time<(settings$waketime+3)),], ts.plot(
+  ts(Q05, start = 0, end = (length(Q05)-1)*settings$dt, frequency = 1/settings$dt),
+  ts(Q25, start = 0, end = (length(Q25)-1)*settings$dt, frequency = 1/settings$dt),
+  ts(Q50, start = 0, end = (length(Q50)-1)*settings$dt, frequency = 1/settings$dt),
+  ts(Q75, start = 0, end = (length(Q75)-1)*settings$dt, frequency = 1/settings$dt),
+  ts(Q95, start = 0, end = (length(Q95)-1)*settings$dt, frequency = 1/settings$dt),
+  xlab=('time [h]'),ylab=('cortisol'),main=(paste('simulated NIGHT cortisol profiles of',people,'people'))
+))
+```
+
+```{r, echo = FALSE, message = FALSE}
+#### 5.4 Odd of disease per additional stressor ####
+
+#settings <- read.csv("settings.csv")
+daydata <- read.csv("daydata.csv")
+
+#choose subset of days to plot
+if(settings$days<=10){plotdays <- 1:settings$days
+} else {plotdays <- seq( as.integer(settings$days/10), settings$days, as.integer(settings$days/10) )}
+
+#make a dataframe to contain the odds ratios and confidence intervals for each day that the will plot
+odds <- data.frame(day = as.ordered(plotdays), OR = rep(NA,length(plotdays)), lower = rep(NA,length(plotdays)), upper = rep(NA,length(plotdays)))
+
+for (aday in plotdays){
+  odds.data <- daydata[which(daydata$day == aday),]
+  
+  if (length(which(odds.data$sick==T))==0 | length(which(odds.data$sick==F))==0){
+    odds$OR[which(odds$day == aday)] <- 1
+    odds$lower[which(odds$day == aday)] <- 1
+    odds$upper[which(odds$day == aday)] <- 1
+  } else {
+    #compute odds ratios
+    odds_model <- with(odds.data, glm(sick~stressfM, family = binomial()))
+    
+    # #assess assumptions
+    # dwt(odds_model) #Independence of errors (Durbin-Watson)
+    # densityplot(rstandard(odds_model)) #check for outliers
+    # hist(dfbeta(odds_model)) #influential cases
+    # densityplot(hatvalues(odds_model)) #influential cases
+    # plot(odds_model)
+    # 
+    # #look at model
+    # summary(odds_model)
+    # 
+    # #model fit by Chi2
+    # Chi_sq <- odds_model$null.deviance-odds_model$deviance
+    # chidf <- odds_model$df.null - odds_model$df.residual
+    # chisq.prob <- 1 - pchisq(Chi_sq, chidf)
+    # Chi_sq; chidf; chisq.prob
+    # 
+    # #model fit by R2
+    # R2.hl<-Chi_sq/odds_model$null.deviance
+    # R.cs<-1-exp((odds_model$deviance-odds_model$null.deviance)/nrow(odds.data))
+    # R.n<-R.cs/(1-(exp(-(odds_model$null.deviance/nrow(odds.data)))))
+    # R2.hl; R.cs; R.n
+    
+    #Store odds ratios
+    odds$OR[which(odds$day == aday)] <- exp(odds_model$coefficients)[2] #position [1] is the intercept...
+    odds$lower[which(odds$day == aday)] <- exp(confint(odds_model))[2,1]
+    odds$upper[which(odds$day == aday)] <- exp(confint(odds_model))[2,2]
+  }
+}
+
+#plot odds ratio's
+ggplot(odds, aes(y= OR, x = day)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=lower, ymax=upper), width=.2) +
+  geom_hline(yintercept = 1, linetype=2) +
+  coord_flip() +
+  labs(title = "OR per day", x = "Day", y = "OR") +
+  theme_bw()
+```
+
+
+##Appendix
+
+```{r, echo = FALSE}
+#sample plots full data
+plotdata <- read.csv("plotdata.csv")
+
+#HPA output
+ggplot(plotdata, aes(x=time, y=HPA)) +
+  geom_line() + facet_wrap( ~ simperson, ncol=1) +
+  ggtitle("Cortisol production (= HPA-axis activity) of 5 randomly selected people (first 2 days)") +
+  ylab("Cortisol production [mmol/L]") + xlab("time [h]")
+
+#cortisol profile
+ggplot(plotdata, aes(x=time, y=C)) +
+  geom_line() + facet_wrap( ~ simperson, ncol=1) +
+  ggtitle("Bloodstream cortisol of 5 randomly selected people (first 2 days)") +
+  ylab("Cortisol [mmol/L]") + xlab("time [h]")
+
+#dynamic load profile
+ggplot(plotdata, aes(x=time, y=L)) +
+  geom_line() + facet_wrap( ~ simperson, ncol=1) +
+  ggtitle("Dynamic load of 5 randomly selected people (first 2 days)") +
+  ylab("Dynamic load") + xlab("time [h]")
+
+#allostatic load profile
+ggplot(plotdata, aes(x=time, y=A)) +
+  geom_line() + facet_wrap( ~ simperson, ncol=1) +
+  ggtitle("Allostatic load of 5 randomly selected people (first 2 days)") +
+  ylab("Allostatic load") + xlab("time [h]")
+```
+
+```{r, echo = FALSE, message = FALSE}
+#### 5.3 Allostatic load ~ average stressor frequency ####
+
+#choose subset of days to plot
+if(settings$days<=10){plotdays <- 1:settings$days
+} else {plotdays <- seq( as.integer(settings$days/10), settings$days, as.integer(settings$days/10) )}
+
+ggplot(subset(daydata, day %in% plotdays), aes(x=stressfM, y=end_A)) +
+  geom_point() + facet_wrap( ~ day, ncol=5) + geom_smooth(method="auto", se=F) +
+  #theme(legend.position="none") + #remove legend
+  ggtitle(paste("Allostatic load vs. work stress, N =",settings$people)) +
+  ylab("Allostatic load") + xlab("average frequency of stressors")
+
+```
+
+
+

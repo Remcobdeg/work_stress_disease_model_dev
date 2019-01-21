@@ -1,0 +1,812 @@
+---
+title: "Simulation output"
+author: "Remco Benthem de Grave"
+output: 
+  html_document:
+    fig_width: 9
+    fig_height: 6
+params:
+   datadir: ""
+   paramsets: ""
+   totalsimtime: ""
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+#make time stamp for later calculation of rendering time
+start.time <- Sys.time()
+
+#load libraries
+
+#function to load a library and install it when it is not yet installed
+package <- function(pack) { #function to load a library and install it when it is not yet installed
+  if (!pack %in% installed.packages()) {install.packages(pack) }
+  library(pack,character.only=TRUE)}
+
+package("ggplot2")
+package("plyr")
+package("dplyr")
+package("tidyr")
+package("tcltk")
+package("ggthemes")
+package("knitr")
+# package("devtools")
+# if (!"patchwork" %in% installed.packages()) {devtools::install_github("thomasp85/patchwork")}; library('patchwork')
+
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- t(matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = ceiling(numPlots/cols), nrow = cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+```{r, include = FALSE, warning = FALSE}
+if(!exists("datadir")){
+  choicedir<-tk_choose.dir(getwd(), "Show folder with data to publish")
+  # if(file.exists(file.path(choicedir,"datadir.RData"))){load(file.path(choicedir,"datadir.RData"));load(file.path(choicedir,"paramsets.Rdata"))
+  #   }else{datadir<-choicedir; paramsets<-NULL}
+  
+  ##define datadir
+
+    #list the file paths to the different simulations in the folder (using a bit of a complex way to get there)
+    subdirlist <- unlist(lapply(list.dirs(choicedir), function(i) unlist(strsplit(i,"/"))[length(unlist(strsplit(i,"/")))])) #for each folder path...
+    #...abstract the name of the last folder in the folderpath
+    subdirlist <- subdirlist[subdirlist %in% dir(choicedir)] #keep only those that are a direct subpath of the choicedir
+    subdirlist <- subdirlist[grepl('sim', subdirlist)] #test for each subdir if it contains 'sim' and keep only those
+    datadir <- file.path(choicedir,subdirlist)
+    if(length(datadir)==0){datadir<-choicedir} #if the choicefolder already contains the simulation data, then keep this folder
+    
+    ##define paramsets
+    
+    #get settings for each simulation
+    set <- function(ddir){load(file.path(ddir,"settings.Rdata"));return(settings)}
+    settingsset <- lapply(datadir, function(ddir) set(ddir))
+    
+    #test which settings are different between 2 simulations
+    uparam<-unique(unlist(lapply(seq_along(settingsset), function(i)
+      which(lapply(names(settingsset[[1]]), function(name) unique(sort(settingsset[[1]][[name]]==settingsset[[i]][[name]]),decreasing = F)[1])==F)
+    )))
+    
+    #create the merged paramsets
+    if(length(uparam)==0){paramsets<-NULL}else{paramsets=lapply(settingsset, function(sett) sett[uparam])}
+}
+if(!exists("paramsets")){paramsets<-NULL}
+```
+
+##### Included simulations
+```{r, echo = FALSE, warning = FALSE, results='asis'}
+shortdatadir <- function(ddir){
+  ddira <- unlist(strsplit(ddir, "/"))
+  return(paste(ddira[which(ddira=="simoutput"):length(ddira)],collapse = "/"))}
+kable(unlist(lapply(datadir, function(ddir) shortdatadir(ddir))))
+```
+
+##### Variation between simulations
+```{r, echo = FALSE, warning = FALSE, results='asis'}
+if(length(datadir)>1){
+    repl <- function(paramset){
+    #function to reshape the parameter list into something printable by kable
+     if("dayoff" %in% names(paramset)){
+       paramset$dayoff=unlist(paramset$dayoff)
+       paramset$dayoff=(paste(as.character(
+             factor(unique(paramset$dayoff%%7), levels=c(0,1,2,3,4,5,6), labels=c('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')
+             )), collapse = " "))}
+    if("waketime" %in% names(paramset)){
+      paramset$waketime=
+        with(paramset, paste0(floor(waketime),':',sprintf("%02d", round(waketime[1]%%1*60))))}
+    if("worktime" %in% names(paramset)){
+      paramset$worktime=unlist(paramset$worktime)
+      paramset$worktime=
+        with(paramset, paste0(floor(worktime[1]),':',sprintf("%02d", round(worktime[1]%%1*60)),' to ',floor(worktime[2]),':',sprintf("%02d", round(worktime[2]%%1*60))))}
+    if("savedays" %in% names(paramset)){
+      paramset$savedays=paste(settingsfortable$savedays, collapse = " ")}
+    if("samplepeople" %in% names(paramset)){
+      paramset$samplepeople=paste(settingsfortable$samplepeople, collapse = " ")}
+    return(as.data.frame(paramset))
+  }
+  # kable(
+  # t(matrix(
+  #   unlist(lapply(paramsets, function(pset) repl(pset))),nrow=length(names(paramsets[[1]]))
+  #   ,dimnames = list(names(paramsets[[1]]),paste("sim",seq_along(paramsets)))))
+  # )
+  paramssetsshow=repl(paramsets[[1]])
+  for(i in 2:length(paramsets)){paramssetsshow<-rbind(paramssetsshow,repl(paramsets[[i]]))}
+  row.names(paramssetsshow)= paste("sim",seq_along(paramsets))
+  kable(paramssetsshow)
+
+}
+```
+
+##### Other settings (identical between the simulations):
+```{r, echo = FALSE, warning=FALSE}
+#create a displayable version of settings
+load(file.path(datadir[1],"settings.Rdata"))
+settingsfortable <- settings
+
+#first conversion of parameter names in some older versions
+settingsfortable$dayoff<-paste(as.character(factor(unique(settingsfortable$dayoff%%7), levels=c(0,1,2,3,4,5,6), labels=c('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'))), collapse = " ")
+
+settingsfortable$halftimeM<-paste0(round(settingsfortable$halftimeM,digits = 3))
+
+settingsfortable$halftimeSD<-paste0(round(settingsfortable$halftimeSD,digits = 3))
+
+settingsfortable$waketime<-with(settingsfortable, paste0(floor(waketime),':',sprintf("%02d", round(waketime[1]%%1*60))))
+
+settingsfortable$stressunif<-with(settingsfortable, paste0(stressunif[1],' to ',stressunif[2]))
+
+settingsfortable$worktime<-with(settingsfortable, paste0(floor(worktime[1]),':',sprintf("%02d", round(worktime[1]%%1*60)),' to ',floor(worktime[2]),':',sprintf("%02d", round(worktime[2]%%1*60))))
+
+settingsfortable$kHPA<-paste0(round(settingsfortable$kHPA,digits = 3))
+
+settingsfortable$delay<-paste0(round(settingsfortable$delay,digits = 3))
+
+settingsfortable$savedays<-paste(settingsfortable$savedays, collapse = " ")
+
+settingsfortable$samplepeople<-paste(settingsfortable$samplepeople, collapse = " ")
+
+names(settingsfortable) <-  c(
+  "samples.per.hour",
+  "days",
+  "people",
+  "integration.method",
+  'nighttime.HPA.axis.impulses.population.mean',
+  'shape.population.distribution.nighttime.HPA.axis.impulses',
+  "time.of.awakening",
+  "factor.of.exponential.growth.factor.of.night.HPA.axis.activity",
+  'distribution.type.used',
+  'worktime.HPA.axis.impulses.population.mean',
+  'shape.population.distribution.nighttime.HPA.axis.impulses',
+  'uniform.distribution.range',
+  "worktime",
+  "day.stress.anticipation",
+  "off.days",
+  "HPA.scaling.factor",
+  "delay.cortisol.response.hour",
+  "cortisol.halftime.M.hour", 
+  "cortisol.halftime.SD.hour", 
+  "threshold.allostatic.load.M",
+  "threshold.allostatic.load.SD",
+  "recovery.factor.dynamic.load.M",
+  "recovery.factor.dynamic.load.SD",
+  "disease.threshold.M",
+  "disease.threshold.SD",
+  "saved.days",
+  "sampled.people")
+
+if(length(datadir)>1){settingsfortable <- settingsfortable[-which(names(settings) %in% names(paramsets[[1]]))]} #remove parameters that are varied between simulations
+
+settingsfortable<-t(as.data.frame(settingsfortable)); colnames(settingsfortable)=c('defaults')
+
+kable(settingsfortable)
+```
+
+##### Evaluations:
+```{r, echo = FALSE}
+logsim <- function(ddir){
+  load(file.path(ddir,"simlog.Rdata"))
+  simlog<-as.data.frame(simlog)
+  simlog[,c(1:3)] <- paste(round(as.numeric(simlog[,c(1:3)]), digits = 3),'min')
+  return(simlog)}
+
+simlogs<-logsim(datadir[1])
+if(length(datadir)>1){for(i in 2:length(datadir)){simlogs<-rbind(simlogs,logsim(datadir[i]))}}
+row.names(simlogs)= paste("sim",seq_along(datadir))
+kable(simlogs)
+```
+
+#### Actual distribution of night- and worktime HPA-axis impulses:
+```{r, echo = FALSE, warning = FALSE}
+#### show population distribution on wake impulses and stress impulses ####
+
+densgraph <- function(ddir){
+  #function that creates a density plot of the wake and stressor frequencies
+  
+  #read data that contains impulse frequencies per person
+  simpopulation <- read.csv(file.path(ddir,"simpopulation.csv"))[,-c(1,2,3,6,7,8,9)]
+  
+  #plot correlation between work impulses and night impulses
+  ggplot(simpopulation, aes(x=night.f.mean_pp,y=stressfM_pp)) + geom_point() + 
+    labs(x="night impulses",y="work impulses") + theme_minimal()
+     
+  
+  simpopulation <- gather(simpopulation,
+                              key = impulsetype, value = freq)
+  simpopulation$impulsetype <- factor(simpopulation$impulsetype, levels = c("night.f.mean_pp","stressfM_pp"),
+                                      labels = c("night impulses","work stressors"))
+  
+  Mw = round(mean(simpopulation$freq[which(simpopulation$impulsetype=="night impulses")]), digits = 1)
+  Ms = round(mean(simpopulation$freq[which(simpopulation$impulsetype=="work impulses")]), digits = 1)
+  SDw = round(sd(simpopulation$freq[which(simpopulation$impulsetype=="night impulses")]), digits = 1)
+  SDs = round(sd(simpopulation$freq[which(simpopulation$impulsetype=="work impulses")]), digits = 1)
+  Medw = round(median(simpopulation$freq[which(simpopulation$impulsetype=="night impulses")]), digits = 1)
+  Meds = round(median(simpopulation$freq[which(simpopulation$impulsetype=="work impulses")]), digits = 1)
+  
+  #plot impulse distributions
+  p <- ggplot(simpopulation, aes(freq,color=impulsetype,fill=impulsetype)) + geom_density(alpha=0.55) + 
+    #labs(title=paste0("Median(SD), wake: ",Medw,"(",SDw,")"," stress: ",Meds,"(",SDs,")"),x="Impulse frequency") + 
+        labs(x="Impulse frequency") + 
+    theme_minimal()  + theme(legend.position=c(.8, .8))
+  
+  
+  return(p)
+}
+
+#obtain desity graphs for all simulations if there is any variation in the number of impulses
+if(sum(c("night.f.mean","wakefSD","stressfM","stressfSD") %in% names(paramsets[[1]]))>0){
+  graphs<-lapply(datadir, function(i) densgraph(i))
+  }else{graphs<-list(densgraph(datadir[1]))} #otherwise only show the density for one of the simulations
+
+e=4 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs),e), function(i) 
+  multiplot(plotlist = graphs[i:ifelse(i+e-1<length(graphs),i+e-1,length(graphs))], cols = 2))
+```
+
+
+##### Cohort data Miller et al. (2017).
+![](Millergraph.png)
+
+```{r, echo = FALSE, warning = FALSE}
+#create average cortisol profile since awakening
+
+makeQgraph <- function(ddir){#first create plot of quantiles since awakening, as in Miller et al.
+  
+  #read data
+  Qdata <- read.csv(file.path(ddir,"Qdata.csv"))[,-c(1,2)]
+  load(file.path(ddir,"settings.Rdata"))
+  
+  #calculate quantiles in data
+  Qdata <- Qdata %>% group_by(time) %>% summarise(
+    Q05=quantile(C,probs=.10),
+    Q25=quantile(C,probs=.25),
+    Q50=quantile(C,probs=.50),
+    Q75=quantile(C,probs=.75),
+    Q95=quantile(C,probs=.90))
+  
+  #reshape to long data frame for ggplot
+  Qdata <- gather(Qdata, key=quantile, value=cortisol, -time)
+  
+  #plot profiles since awakening
+  pa<- ggplot(subset(Qdata, time>=settings$waketime), aes(x=time-settings$waketime,y=cortisol,group=quantile)) + 
+    geom_line(aes(linetype=quantile)) + 
+    scale_linetype_manual(values=c("dotted","twodash","solid","twodash","dotted"),
+                         name="Percentile",
+                         breaks=c("Q90", "Q75", "Q50", "Q25", "Q10"),
+                         labels=c("90th", "75th", "50th", "25th", "10th")) +
+    scale_x_continuous(breaks=seq(0, 20, 2)) +
+    labs(title=paste0("f-wake=",settings$night.f.mean,"(",settings$wakefSD,") ","f-stress=",settings$stressfM,"(",settings$stressfSD,")"),x="time") +
+    theme_minimal() + theme(legend.justification=c(.9,.9), legend.position=c(.9,.9)) + coord_cartesian(xlim=c(0,12) ,ylim=c(0, 19))
+  
+  #plot the whole profiles
+  pt<-ggplot(Qdata, aes(x=time,y=cortisol,group=quantile)) + 
+    geom_line(aes(linetype=quantile)) + 
+    scale_linetype_manual(values=c("dotted","twodash","solid","twodash","dotted")) +
+    labs(title=paste0("f-wake=",settings$night.f.mean,"(",settings$wakefSD,") ","f-stress=",settings$stressfM,"(",settings$stressfSD,")")) +
+    theme_bw() + theme(legend.position="none")
+  
+  #plot profiles until 3h after awakening
+  pn<-ggplot(subset(Qdata, time<=settings$waketime+3 & quantile %in% c("Q05","Q50","Q95")),  aes(x=time,y=cortisol,group=quantile)) + 
+    geom_line(aes(linetype=quantile)) + 
+    scale_linetype_manual(values=c("dotted","solid","dotted")) +
+    scale_x_continuous(breaks=seq(0, 9, 1)) +
+    labs(title=paste0("f-wake=",settings$night.f.mean,"(",settings$wakefSD,") ","f-stress=",settings$stressfM,"(",settings$stressfSD,")"),x="time") +
+    theme_bw() + theme(legend.position="none")
+  
+  return(list(pa=pa,pt=pt,pn=pn))
+}
+
+#makegraphs
+graphs<-sapply(datadir, function(i) makeQgraph(i))
+#restructure the 3 different graph types in sub-lists 
+graphs<-lapply(seq(3), function(i) graphs[seq(i,length(graphs),3)])
+```
+
+##### Average cortisol profiles since awakening
+
+```{r, echo = FALSE, warning = FALSE}
+#multiplot(plotlist = graphs[[1]],cols = 3)
+e=6 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs),e), function(i) 
+  multiplot(plotlist = graphs[[1]][i:ifelse(i+e-1<length(graphs[[1]]),i+e-1,length(graphs[[1]]))], cols = 3))
+```
+
+##### Average cortisol profiles since midnight
+
+```{r, echo = FALSE, warning = FALSE}
+#multiplot(plotlist = graphs[[2]],cols = 3)
+e=6 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs),e), function(i) 
+  multiplot(plotlist = graphs[[2]][i:ifelse(i+e-1<length(graphs[[2]]),i+e-1,length(graphs[[2]]))], cols = 3))
+```
+
+##### Night time cortisol profiles Clow et al. (2009).
+![](night_cortisol_clow.png)
+
+##### Average nighttime cortisol profiles
+
+```{r, echo = FALSE, warning = FALSE}
+#multiplot(plotlist = graphs[[3]],cols = 1)
+e=6 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs),e), function(i) 
+  multiplot(plotlist = graphs[[3]][i:ifelse(i+e-1<length(graphs[[3]]),i+e-1,length(graphs[[3]]))], cols = 3))
+```
+
+#### odds-ratio of developing disease for varying stressor frequencies
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+#### 5.4 Odd of disease per additional stressor ####
+
+makeoddsplot <- function(ddir){
+  
+  #read data
+  daydata <- read.csv(file.path(ddir,"daydata.csv"))[,-c(1,2)]
+
+  getodds <- function(data){
+    if(length(unique(data$Sick))<2 | length(unique(data$stressfM))<2) #if all instances are either TRUE of FALSE
+    {OR<-upper<-lower<-1
+    } else {
+      model <- with(data, glm(Sick~scale(stressfM), family = binomial()))    #Store odds ratios
+      if(model$converged==T){
+        OR <- exp(model$coefficients)[2] #position [1] is the intercept...
+        lower <- exp(confint(model))[2,1]
+        upper <- exp(confint(model))[2,2]} else {
+          OR<-upper<-lower<-1
+        }
+    }
+    return(data.frame(day=unique(data$day),OR,lower,upper))
+  }
+  
+  odds <- ldply(unique(daydata$days), function(day) getodds(subset(daydata, days==day)))
+  
+  print(kable(odds))
+  
+  #plot odds ratio's
+  p <- ggplot(odds, aes(y= OR, x = day)) +
+    geom_point() +
+    geom_errorbar(aes(ymin=lower, ymax=upper), width=.2) +
+    geom_hline(yintercept = 1, linetype=2) +
+    scale_x_continuous(breaks=odds$day) +
+    #coord_flip() + 
+    coord_trans(y="log2") +
+    labs(x = "Day", y = "relative disease risk") +
+    theme_bw()
+
+  
+  # #assess assumptions
+  # dwt(odds_model) #Independence of errors (Durbin-Watson)
+  # densityplot(rstandard(odds_model)) #check for outliers
+  # hist(dfbeta(odds_model)) #influential cases
+  # densityplot(hatvalues(odds_model)) #influential cases
+  # plot(odds_model)
+  #
+  # #look at model
+  # summary(odds_model)
+  #
+  # #model fit by Chi2
+  # Chi_sq <- odds_model$null.deviance-odds_model$deviance
+  # chidf <- odds_model$df.null - odds_model$df.residual
+  # chisq.prob <- 1 - pchisq(Chi_sq, chidf)
+  # Chi_sq; chidf; chisq.prob
+  #
+  # #model fit by R2
+  # R2.hl<-Chi_sq/odds_model$null.deviance
+  # R.cs<-1-exp((odds_model$deviance-odds_model$null.deviance)/nrow(odds.data))
+  # R.n<-R.cs/(1-(exp(-(odds_model$null.deviance/nrow(odds.data)))))
+  # R2.hl; R.cs; R.n
+  
+  return(p)
+}
+
+#get oddsplots
+graphs<-lapply(datadir, function(i) makeoddsplot(i))
+
+#multiplot(plotlist = graphs,cols = 3)
+e=6 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs),e), function(i) 
+  multiplot(plotlist = graphs[i:ifelse(i+e-1<length(graphs),i+e-1,length(graphs))], cols = 3))
+```
+
+
+Robustness odds plot
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+#### 5.xx Relative risk of becoming diseased when going up one SD along the population distribution of work stressors - divided in r_l, L_A en A_D  ####
+
+if(length(datadir)>1 & sum(c('rLM','thLM','thAM') %in% names(paramsets[[1]]))==3){
+  
+  #function to get the odds per day in the simulation
+  getodds <- function(data){
+    if(length(unique(data$Sick))<2 | length(unique(data$stressfM))<2) #if all instances are either TRUE of FALSE
+    {OR<-upper<-lower<-1
+    } else {
+      model <- with(data, glm(Sick~scale(stressfM), family = binomial()))    #Store odds ratios
+      if(model$converged==T){
+        OR <- exp(model$coefficients)[2] #position [1] is the intercept...
+        lower <- exp(confint(model))[2,1]
+        upper <- exp(confint(model))[2,2]} else {
+          OR<-upper<-lower<-1
+        }
+    }
+    return(data.frame(day=unique(data$day),OR,lower,upper))
+  }
+  
+  #function to get the odds per simulation
+  getodds_all <- function(ddir){
+    
+    #read data
+    daydata <- read.csv(file.path(ddir,"daydata.csv"))[,-c(1,2)]
+    load(file.path(ddir,"settings.Rdata"))
+  
+    odds <- ldply(unique(daydata$days), function(day) getodds(subset(daydata, days==day)))
+    odds$rL <- rep(settings$rLM, nrow(odds))
+    odds$L_A <- rep(settings$thLM, nrow(odds))
+    odds$A_D <- rep(settings$thAM, nrow(odds))
+  
+    return(odds)
+  }
+  
+  #combine the odds rations from all simulations
+  odds_all<-ldply(datadir, function(ddir) getodds_all(ddir))
+  odds_all$rL<-as.factor(odds_all$rL) # label = c(paste(expression(rho[E]*' = .3')),paste(expression(rho[E]*' = .6')),paste(expression(rho[E]*' = .9'))))
+  odds_all$L_A<-as.factor(odds_all$L_A)
+  odds_all$A_D<-as.factor(odds_all$A_D)
+  
+  
+  
+  #truncate the values to show max 100, for visibility reasons
+  for (type in c('OR','lower','upper')){odds_all[[type]] <- sapply(odds_all[[type]], function(i) min(i,100))}
+
+#plot odds ratio's
+ggplot(odds_all, aes(y= OR, x = day, shape = A_D)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=lower, ymax=upper), width=.2) +
+  facet_grid(L_A ~ rL, labeller = label_bquote(rows = rho[E] == .(.9), cols = epsilon['A'] == .(30))) +
+  geom_hline(yintercept = 1, linetype=2) +
+  #coord_flip() +
+  coord_trans(y="log10") +
+  #coord_cartesian(ylim=c(.01, 100)) + #limit the visible range
+  scale_y_continuous(breaks=c(1, 10, 100),minor_breaks=c(seq(1,10,1),seq(20,100,10))) + # Ticks 
+  scale_x_continuous(breaks=odds_all$day) +
+  scale_shape_discrete(name=expression(epsilon['D'])) +
+  #labs(title = expression('Relative disease risk - split by value of '*epsilon['A']*' (horizontal) and '*rho['E']*' (vertical)'), x = "Day", y = "Relative disease risk") +
+  labs(x = "Day", y = "Relative disease risk") +
+  theme_minimal() + theme(legend.position="bottom")
+
+ggsave('odds_no_ant.png', width = 12.5, height = 10, units = "cm")
+    
+  
+    # #assess assumptions
+    # dwt(odds_model) #Independence of errors (Durbin-Watson)
+    # densityplot(rstandard(odds_model)) #check for outliers
+    # hist(dfbeta(odds_model)) #influential cases
+    # densityplot(hatvalues(odds_model)) #influential cases
+    # plot(odds_model)
+    #
+    # #look at model
+    # summary(odds_model)
+    #
+    # #model fit by Chi2
+    # Chi_sq <- odds_model$null.deviance-odds_model$deviance
+    # chidf <- odds_model$df.null - odds_model$df.residual
+    # chisq.prob <- 1 - pchisq(Chi_sq, chidf)
+    # Chi_sq; chidf; chisq.prob
+    #
+    # #model fit by R2
+    # R2.hl<-Chi_sq/odds_model$null.deviance
+    # R.cs<-1-exp((odds_model$deviance-odds_model$null.deviance)/nrow(odds.data))
+    # R.n<-R.cs/(1-(exp(-(odds_model$null.deviance/nrow(odds.data)))))
+    # R2.hl; R.cs; R.n
+  
+}
+```
+
+
+
+#### between simulations - relative predictions about people becoming sick
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+#### 5.5 Changes in disease risk between simulations ####
+
+if(length(datadir)>1){#only if it concerns multiple simulations
+
+  #function to calculate the odds
+  getodds2 <- function(data){
+    if(sum(sapply(unique(data$sim.nr), function(nr)
+      length(unique(data$sick[which(data$sim.nr==nr)]))<2))>0
+      | length(unique(data$sim.nr))<2) #if all instances are either TRUE of FALSE
+    {OR<-upper<-lower<-1
+    } else {
+      model <- with(data, glm(sick~sim.nr, family = binomial()))    #Store odds ratios
+      if(model$converged==T){
+        OR <- exp(model$coefficients)[2] #position [1] is the intercept...
+        lower <- exp(confint(model))[2,1]
+        upper <- exp(confint(model))[2,2]} else {
+          OR<-upper<-lower<-1
+        }
+    }
+    return(data.frame(OR,lower,upper))
+  }
+  
+  #function to make the oddsplot
+  makeoddsplot2 <- function(daydataall,sim1){  
+    odds <- ldply(unique(daydataall$sim.nr), function(sim2) getodds2(daydataall[which(daydataall$sim.nr %in% c(sim1,sim2)),]))
+    row.names(odds)<-paste0("vs.sim.",seq_along(row.names(odds)))
+    odds$versus<-seq_along(row.names(odds))
+    
+    print(kable(odds))
+
+    
+    #create plot of odds ratio's
+    p <- ggplot(odds, aes(y= OR, x = versus)) +
+      geom_point() +
+      geom_errorbar(aes(ymin=lower, ymax=upper), width=.2) +
+      geom_hline(yintercept = 1, linetype=2) +
+      #coord_flip() + 
+      coord_trans(y="log2") +
+      scale_x_continuous(breaks=odds$versus) +
+      labs(x = paste(sim1,"versus sim..."), y = "stress, standardized") +
+      theme_bw() + theme(axis.title.x = element_blank())
+    
+    return(p)
+    }
+  
+  #read data which contains information on whether or not are sick at the end of the simulation
+  daydataall <- as.data.frame(matrix(unlist(sapply(datadir, function(i) read.csv(file.path(i,"daydata.csv"))[,c(4,7)])),ncol = 2*length(datadir)))
+  daydataall<-daydataall[which(daydataall$V1==max(daydataall$V1)),seq(2,ncol(daydataall),2)] #only retain the last day
+  
+  #shape to long format
+  names(daydataall)<-paste("sim",seq_along(datadir))
+  daydataall<-gather(daydataall, key = sim.nr, value = sick)
+  
+  #execute functions to create the odds plots
+  graphs <- lapply(unique(daydataall$sim.nr), function(sim1) makeoddsplot2(daydataall,sim1))
+  
+  #multiplot(plotlist = graphs,cols = 3)
+  e=6 #start a new multiplot frame after each 4 plots
+  l_ply(seq(1,length(graphs),e), function(i) 
+  multiplot(plotlist = graphs[i:ifelse(i+e-1<length(graphs),i+e-1,length(graphs))], cols = 3))
+} else{print('NA')}
+```
+
+##Appendix
+
+```{r, echo = FALSE, warning = FALSE}
+
+sampleplots <- function(ddir){
+  
+  #read data
+  plotsample <- read.csv(file.path(ddir,"plotsample.csv"))[,-c(1,2)]
+
+  #reshape into long format
+  plotsample=gather(plotsample, key = "type", value = "value", -c(time,simperson))
+  
+  #make sure that the order is kept and asign labels
+  plotsample$type <- factor(plotsample$type, levels=c("HPA", "C", "L","A"), labels=c("Impulses", "Cortisol", "Elastic load","Allostatic load"), ordered=TRUE)
+  
+  #plot
+  ggplot(plotsample, aes(x=time, y=value)) +
+    geom_line() + facet_grid(type ~ simperson, scales="free") +
+    ylab("Value [arbitrary units]") + xlab("time [hours]") + theme_bw() 
+} 
+
+#plot samples per simulation
+l_ply(datadir, function(ddir) sampleplots(ddir))
+```
+
+##### 24h cortisol profiles of 17 individuals from Hosseinichimeh et al. (2015).
+![](individuals-hosseinichimeh.png)
+
+##### 24h cortisol profiles from 5 randomly selected people
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+sampleplots <- function(ddir){
+  
+  #read data
+  plotsample <- read.csv(file.path(ddir,"plotsample.csv"))[,-c(1,2)]
+
+  #cortisol profiles of only the first day for comparison with Hosseinichimeh 2015
+  p <- ggplot(subset(plotsample, time<24), aes(x=time, y=C)) +
+    geom_line() + facet_wrap( ~ simperson, ncol=5) +
+    ylab("cortisol [arbitrary units]") + xlab("time [h]") +
+    theme_bw() #+ 
+    # theme(
+    #   strip.background = element_blank(),
+    #   strip.text.x = element_blank(),
+    #   axis.title.x = element_blank(),
+    #   axis.title.y = element_blank())
+      
+  return(p)}
+
+graphs<-lapply(datadir, function(ddir) sampleplots(ddir)) #make separate sublists for the 
+e=2 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs),e), function(i) 
+  multiplot(plotlist = graphs[i:ifelse(i+e-1<length(graphs),i+e-1,length(graphs))], cols = 1))
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+if(length(datadir)>1 & sum(c('rLM','thLM','thAM') %in% names(paramsets[[1]]))==3){
+
+#### 5.3 Allostatic load ~ average stressor frequency ####
+
+  #combine allostatic load from all simulations into one dataframe for plotting
+  get_aload <- function(ddir){
+  
+    #read data
+    daydata <- read.csv(file.path(ddir,"daydata.csv"))[,-c(1,2)]
+    load(file.path(ddir,"settings.Rdata"))
+  
+    daydata$simperson<-as.factor(daydata$simperson)
+    daydata$rL<-as.factor(rep(settings$rLM,nrow(daydata)))
+    daydata$L_A<-as.factor(rep(settings$thLM,nrow(daydata)))
+    daydata$A_D<-as.factor(rep(settings$thAM,nrow(daydata)))
+
+    return(daydata)}
+  
+  daydataall <- ldply(datadir, function(ddir) get_aload(ddir))
+  
+
+  
+  #plot the distributions of allostatic load
+  ggplot(subset(daydataall, days == max(days) & A_D == 400), aes(x=scale(stressfM)[,1], y=Aload)) +
+    geom_point() + geom_smooth(method="lm", se=F, colour="red") +
+    facet_grid(rL ~ L_A, scales="free") + 
+    #labs(title = expression('Allostatic load per individual at day 200 - split by value of L'['A']*' (horizontal) and r'['L']*' (vertical)'), x = "average frequency of stressors", y = "Allostatic load") +
+    labs(x = "individual average work stressors (standardized)", y = "Allostatic load") +
+    theme_minimal()
+
+  ## for each simulation, plot time development of max 100 individuals becoming sick
+  get_sick_profiles <- function(ddir){
+  
+    #read data
+    daydata <- read.csv(file.path(ddir,"daydata.csv"))[,-c(1,2)]
+    load(file.path(ddir,"settings.Rdata"))
+    
+      #first determine who gets sick and who stays healthy (only the first 100 at max)
+      getsick <- unique(daydata$simperson[which(daydata$Sick==T & daydata$days == max(daydata$days))])
+      #healthy <- unique(daydata$simperson[which(daydata$Sick==F & daydata$days == max(daydata$days))])
+      getsick <- getsick[1:ifelse(length(getsick)>100,100,length(getsick))]
+      #healthy <- healthy[1:ifelse(length(healthy)>100,100,length(healthy))]
+      
+      daydata <- subset(daydata,simperson %in% getsick)
+      
+      daydata$simperson<-as.factor(daydata$simperson)
+      daydata$rL<-as.factor(rep(settings$rLM,nrow(daydata)))
+      daydata$L_A<-as.factor(rep(settings$thLM,nrow(daydata)))
+      daydata$A_D<-as.factor(rep(settings$thAM,nrow(daydata)))
+      
+    return(daydata)}
+  
+  daydataall <- ldply(datadir, function(ddir) get_sick_profiles(ddir))
+  
+  ggplot(daydataall, aes(x=days, y=Aload, color = simperson)) +
+    geom_line() + facet_grid(rL ~ L_A) + 
+    labs(title = 'allostatic load growth curves of 100 people becoming diseases', x = 'time [days]', y = "Allostatic load") + theme_bw() + theme(legend.position="none")  
+}
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+#### 5.3 Allostatic load ~ average stressor frequency ####
+
+aloadplot <- function(ddir){
+  
+  #read data
+  daydata <- read.csv(file.path(ddir,"daydata.csv"))[,-c(1,2)]
+  load(file.path(ddir,"settings.Rdata"))
+  
+  daydata$simperson<-as.factor(daydata$simperson)
+  
+  ## plotting time development of max 100 individuals becoming sick
+  
+  #first determine who gets sick and who stays healthy (only the first 100 at max)
+  getsick <- unique(daydata$simperson[which(daydata$Sick==T & daydata$days == max(daydata$days))])
+  healthy <- unique(daydata$simperson[which(daydata$Sick==F & daydata$days == max(daydata$days))])
+  getsick <- getsick[1:ifelse(length(getsick)>100,100,length(getsick))]
+  healthy <- healthy[1:ifelse(length(healthy)>100,100,length(healthy))]
+  
+  psick <- ggplot(subset(daydata,simperson %in% getsick), aes(x=days, y=Aload, color = simperson)) +
+    geom_line() + ylab("Allostatic load") + xlab("time [days]") + theme_bw() + 
+    theme(legend.position="none")
+  
+  phealthy <- ggplot(subset(daydata,simperson %in% healthy), aes(x=days, y=Aload, color = simperson)) +
+    geom_line() + ylab("Allostatic load") + xlab("time [days]") + theme_bw() + 
+    theme(legend.position="none")
+
+  #create a plot of all allostatic load vs. stressor level
+  daydata$days <- as.factor(daydata$days); levels(daydata$days) <- paste0("day",daydata$days)  
+  
+  p <- ggplot(daydata, aes(x=stressfM, y=Aload)) +
+    geom_point() + facet_wrap( ~ days, ncol=length(unique(daydata$days))) + geom_smooth(method="auto", se=F, colour="grey") +
+    #ggtitle(paste("Allostatic load vs. work stress, N =",settings$people)) +
+    ylab("Allostatic load") + xlab("average frequency of stressors") + theme_bw() + 
+    theme(
+      strip.background = element_blank(),
+      strip.text.x = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank()
+    )
+  
+  return(list(p,psick,phealthy))
+}
+
+#get oddsplots
+graphs <- sapply(datadir, function(i) aloadplot(i))
+graphs <- lapply(seq(3), function(i) graphs[seq(i,length(graphs),3)]) #make separate sublists for the different contents
+
+load(file.path(datadir[1],"settings.Rdata")) #for "savedays"
+```
+
+##### Allostatic load vs. work stress on days `r paste(settings$savedays,sep = ', ')`
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+e=4 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs[[1]]),e), function(i) 
+  multiplot(plotlist = graphs[[1]][i:ifelse(i+e-1<length(graphs[[1]]),i+e-1,length(graphs[[1]]))], cols = 1))
+
+```
+
+##### Development of allostatic load over time for people that get sick
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+e=4 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs[[2]]),e), function(i) 
+  multiplot(plotlist = graphs[[2]][i:ifelse(i+e-1<length(graphs[[2]]),i+e-1,length(graphs[[2]]))], cols = 1))
+
+```
+
+##### Development of allostatic load over time for people that stay healthy
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+e=4 #start a new multiplot frame after each 4 plots
+l_ply(seq(1,length(graphs[[3]]),e), function(i) 
+  multiplot(plotlist = graphs[[3]][i:ifelse(i+e-1<length(graphs[[3]]),i+e-1,length(graphs[[3]]))], cols = 1))
+
+```
+
+##### Time taken   
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+print('Simulation time [min]:')
+      if(exists("totalsimtime")){print(totalsimtime)}
+print('Rendering time [min]:')
+  print(round(as.numeric(difftime(Sys.time(), start.time, unit="mins"))))
+print('Total time [min]:')
+print(ifelse(exists("totalsimtime"),totalsimtime,0) + round(as.numeric(difftime(Sys.time(), start.time, unit="mins"))))
+
+```
+
+

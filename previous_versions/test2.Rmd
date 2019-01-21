@@ -1,0 +1,89 @@
+---
+title: "Simulation output"
+author: "Remco Benthem de Grave"
+output: html_document
+params:
+   datadir: ''
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+
+#make time stamp for later calculation of rendering time
+start.time <- Sys.time()
+
+settings <- list(dt = NA) #initialize list
+  
+  ## simulation settings
+  settings$fs <- fs <- 6 #samples per hour
+  settings$N <- 24*fs #number of samples in one day
+  settings$days <- 10
+  settings$people <- 10
+  settings$integration <- "RK4"
+  
+  ## off-work days
+  settings$dayoff <- c(0,6,7) #weekday 0 == weekday 7; for computational reasons, always include both
+  
+  ## parameters that determine the cortisol profile
+  
+  #cortisol decay
+  settings$halftimeM <- 80/60 #half time of cortisol is 80 minutes or 4/3hour
+  settings$halftimeSD <- 8/60 #between person variation
+  
+  #awakening impulse
+  settings$CAR <- .5 #time after onset of the awakening impulse that people (report) waking up 
+  settings$wakefM <- 40 
+  settings$wakefSD <- 10
+  settings$waketime <- 6.5
+  
+  #work stressors
+  settings$stressfM <- 10; 
+  settings$stressfSD <- 5 #frequency of stress stressors
+  settings$worktime <- c(8,17)
+  
+  ## parameters that determine how a cortisol profile translates into allostatic load and sickness
+  settings$thLM <- 15 #threshold of dynamic load becoming allostatic load 
+  settings$thLSD <- 0
+  settings$rLM <- .3 #rate at which the body recovers form the dynamic load
+  settings$rLSD <- 0
+  settings$thAM <- 100 #threshold of allostatic load causing disease
+  settings$thASD <- 0
+  
+  ## number of days to save and display
+  settings$savedays <- 10 
+```
+
+
+
+Analyzed file: 
+`r getwd()`
+
+##Simulation settings:##  
+Sample rate (/h): `r settings$fs`  
+Simulated days: `r settings$days`  
+Simulated people: `r settings$people`  
+  
+##Parameters:## 
+Workdays: `r c(1:7)[!(c(1:7) %in% settings$dayoff)]`   
+Working hours: `r settings$worktime[1]`:00 to `r settings$worktime[2]`:00    
+Wakeup time: `r settings$waketime`0   
+
+Work stressors: M = `r settings$stressfM`, SD = `r settings$stressfSD`  
+
+Night time HPA firings: M = `r settings$wakefM`, SD = `r settings$wakefSD`  
+Night activity HPA axis: 0:00 to `r settings$CAR + settings$waketime`:00   
+
+Cortisol halftime: M = `r settings$halftimeM`, SD = `r settings$halftimeSD`  
+Recovery rate : M = `r settings$rLM`, SD = `r settings$rLSD`  
+Allostatic load threshold: M = `r settings$thLM`, SD = `r settings$thLSD`  
+Disease threshold: M = `r settings$thAM`, SD = `r settings$thASD`  
+```{r}
+Sys.time()-start.time
+```
+
+![Caption for the picture.](Millergraph.png)
+
+Rendering time: `r Sys.time()-start.time`
+

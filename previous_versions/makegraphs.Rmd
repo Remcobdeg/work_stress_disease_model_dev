@@ -1,0 +1,229 @@
+---
+title: "Simulation output"
+author: "Remco Benthem de Grave"
+output: html_document
+params:
+   datadir: ""
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+#make time stamp for later calculation of rendering time
+start.time <- Sys.time()
+
+#load libraries
+
+#function to load a library and install it when it is not yet installed
+package <- function(pack) { #function to load a library and install it when it is not yet installed
+  if (!pack %in% installed.packages()) {install.packages(pack) }
+  library(pack,character.only=TRUE)}
+
+package("ggplot2")
+package("plyr")
+package("dplyr")
+package("tidyr")
+package("tcltk")
+package("ggthemes")
+```
+
+```{r, include = FALSE, warning = FALSE}
+#set file directory
+if(params$datadir != ""){setwd(params$datadir)}else{setwd(tk_choose.dir(getwd(), "Choose data folder"))}
+filename <- getwd()
+
+#load files
+load("settings.Rdata")
+Qdata <- read.csv("Qdata.csv")[,-c(1,2)]
+daydata <- read.csv("daydata.csv")[,-c(1,2)]
+plotsample <- read.csv("plotsample.csv")[,-c(1,2)]
+load("simlog.Rdata")
+```
+
+Analyzed file: 
+`r filename`
+
+##Simulation settings:##  
+Sample rate (/h): `r settings$fs`  
+Simulated days: `r settings$days`  
+Simulated people: `r settings$people`  
+
+##Parameters:## 
+Workdays: `r c(1:7)[!(c(1:7) %in% settings$dayoff)]`   
+Working hours: `r settings$worktime[1]`:00 to `r settings$worktime[2]`:00    
+Wakeup time: `r settings$waketime`0   
+
+Work stressors: M = `r settings$stressfM`, SD = `r settings$stressfSD`  
+
+Night time HPA firings: M = `r settings$wakefM`, SD = `r settings$wakefSD`  
+Night activity HPA axis: 0:00 to `r settings$CAR + settings$waketime`:00   
+
+Cortisol halftime: M = `r settings$halftimeM`, SD = `r settings$halftimeSD`  
+Recovery rate : M = `r settings$rLM`, SD = `r settings$rLSD`  
+Allostatic load threshold: M = `r settings$thLM`, SD = `r settings$thLSD`  
+Disease threshold: M = `r settings$thAM`, SD = `r settings$thASD`  
+
+
+![Cohort data Miller et al. (2017).](Millergraph.png)
+
+```{r, echo = FALSE, warning = FALSE}
+#create average cortisol profile since awakening
+start.time <- Sys.time()
+
+#first create plot of quantiles since awakening, as in Miller et al.
+Qdata <- Qdata %>% group_by(time) %>% summarise(
+  Q05=quantile(C,probs=.05),
+  Q25=quantile(C,probs=.25),
+  Q50=quantile(C,probs=.50),
+  Q75=quantile(C,probs=.75),
+  Q95=quantile(C,probs=.95))
+
+#reshape to long data frame for ggplot
+Qdata <- gather(Qdata, key=quantile, value=cortisol, -time)
+
+#plot profiles since awakening
+ggplot(subset(Qdata, time>=settings$waketime), aes(x=time-settings$waketime,y=cortisol,group=quantile)) + 
+  geom_line(aes(linetype=quantile)) + 
+  scale_linetype_manual(values=c("dotted","twodash","solid","twodash","dotted")) +
+  scale_x_continuous(breaks=seq(0, 20, 2)) +
+  labs(title="Average cortisol profiles since awakening",x="time") +
+  theme_bw()
+
+#plot the whole profiles
+ggplot(Qdata, aes(x=time,y=cortisol,group=quantile)) + 
+  geom_line(aes(linetype=quantile)) + 
+  scale_linetype_manual(values=c("dotted","twodash","solid","twodash","dotted")) +
+  labs(title="Average cortisol profiles since midnight") +
+  theme_bw()
+
+#plot profiles until 3h after awakening
+ggplot(subset(Qdata, time<=settings$waketime+3), aes(x=time-settings$waketime,y=cortisol,group=quantile)) + 
+  geom_line(aes(linetype=quantile)) + 
+  scale_linetype_manual(values=c("dotted","twodash","solid","twodash","dotted")) +
+  scale_x_continuous(breaks=seq(0, 20, 2)) +
+  labs(title="Average nighttime cortisol profiles ",x="time") +
+  theme_bw()
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+#### 5.4 Odd of disease per additional stressor ####
+
+getodds <- function(data){
+  if(length(unique(data$Sick))<2) #if all instances are either TRUE of FALSE
+  {OR<-upper<-lower<-1
+  } else {
+    model <- with(data, glm(Sick~stressfM, family = binomial()))    #Store odds ratios
+    if(model$converged==T){
+      OR <- exp(model$coefficients)[2] #position [1] is the intercept...
+      lower <- exp(confint(model))[2,1]
+      upper <- exp(confint(model))[2,2]} else {
+        OR<-upper<-lower<-1
+      }
+  }
+  return(data.frame(day=unique(data$day),OR,lower,upper))
+}
+
+#daydata$Sick <- ifelse(runif(100)>.5,T,F)
+
+odds <- ldply(unique(daydata$days), function(day) getodds(subset(daydata, days==day)))
+
+#plot odds ratio's
+ggplot(odds, aes(y= OR, x = day)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=lower, ymax=upper), width=.2) +
+  geom_hline(yintercept = 1, linetype=2) +
+  coord_flip() +
+  scale_x_continuous(breaks=odds$day) +
+  labs(title = "OR per day", x = "Day", y = "OR") +
+  theme_bw()
+
+# #assess assumptions
+# dwt(odds_model) #Independence of errors (Durbin-Watson)
+# densityplot(rstandard(odds_model)) #check for outliers
+# hist(dfbeta(odds_model)) #influential cases
+# densityplot(hatvalues(odds_model)) #influential cases
+# plot(odds_model)
+#
+# #look at model
+# summary(odds_model)
+#
+# #model fit by Chi2
+# Chi_sq <- odds_model$null.deviance-odds_model$deviance
+# chidf <- odds_model$df.null - odds_model$df.residual
+# chisq.prob <- 1 - pchisq(Chi_sq, chidf)
+# Chi_sq; chidf; chisq.prob
+#
+# #model fit by R2
+# R2.hl<-Chi_sq/odds_model$null.deviance
+# R.cs<-1-exp((odds_model$deviance-odds_model$null.deviance)/nrow(odds.data))
+# R.n<-R.cs/(1-(exp(-(odds_model$null.deviance/nrow(odds.data)))))
+# R2.hl; R.cs; R.n
+```
+
+
+##Appendix
+
+```{r, echo = FALSE, warning = FALSE}
+
+#HPA output
+ggplot(plotsample, aes(x=time, y=HPA)) +
+  geom_line() + facet_wrap( ~ simperson, ncol=1) +
+  ggtitle("Cortisol production (= HPA-axis activity) of 5 randomly selected people (first 7 days)") +
+  ylab("Cortisol production [mmol/L]") + xlab("time [h]")
+
+#cortisol profile
+ggplot(plotsample, aes(x=time, y=C)) +
+  geom_line() + facet_wrap( ~ simperson, ncol=1) +
+  ggtitle("Bloodstream cortisol of 5 randomly selected people (first 7 days)") +
+  ylab("Cortisol [mmol/L]") + xlab("time [h]")
+
+#dynamic load profile
+ggplot(plotsample, aes(x=time, y=L)) +
+  geom_line() + facet_wrap( ~ simperson, ncol=1) +
+  ggtitle("Dynamic load of 5 randomly selected people (first 7 days)") +
+  ylab("Dynamic load") + xlab("time [h]")
+
+#allostatic load profile
+ggplot(plotsample, aes(x=time, y=A)) +
+  geom_line() + facet_wrap( ~ simperson, ncol=1) +
+  ggtitle("Allostatic load of 5 randomly selected people (first 7 days)") +
+  ylab("Allostatic load") + xlab("time [h]")
+
+# #alternative for plotting
+# ggplot(subset(plotsample, time<24), aes(x=time, y=C)) +
+#   geom_line() + facet_wrap( ~ simperson, ncol=3) +
+#   ggtitle("Cortisol production (= HPA-axis activity) of 5 randomly selected people (first 7 days)") +
+#   ylab("Cortisol production [mmol/L]") + xlab("time [h]") +
+#   theme_bw()
+
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+#### 5.3 Allostatic load ~ average stressor frequency ####
+
+daydata$days <- as.factor(daydata$days); levels(daydata$days) <- paste0("day",daydata$days)  
+
+ggplot(daydata, aes(x=stressfM, y=Aload)) +
+  geom_point() + facet_wrap( ~ days, ncol=5) + geom_smooth(method="auto", se=F, colour="grey") +
+  #theme(legend.position="none") + #remove legend
+  ggtitle(paste("Allostatic load vs. work stress, N =",settings$people)) +
+  ylab("Allostatic load") + xlab("average frequency of stressors") + 
+  theme_bw()
+
+#determine ratio of people having developed allostatic load during the simulation
+simlog$loadratio <- sum(daydata$Aload[which(daydata$days==paste0("day",settings$days))]>rep(0,settings$people))/settings$people
+
+```
+
+```{r, echo = FALSE, warning = FALSE}
+simlog$rendertime <- Sys.time()-start.time
+```
+
+
+```{r}
+#display settings and simlog
+settings
+simlog
+```
+
