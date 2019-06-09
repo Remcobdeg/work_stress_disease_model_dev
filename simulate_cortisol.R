@@ -11,15 +11,9 @@ rm(list = ls()) #clear the environment
 
 paramsets <- list(
   list(#simulation 1
-  #   wakefM = 8, #per day
-  #   dshape.wake = 1.2,
-  #   anticipation = c("YES","NO")[1],
-  #   stressfM = 6, #per 8h
-  #   dshape.stress = 3
-  # ),list(#simulation 2
-    wakefM = 14, #per day
-    dshape.wake = 2.5,
-    anticipation = c("YES","NO")[2],
+    wakefM = 8, #per day
+    dshape.wake = 1,
+    anticipation = c("YES","NO")[1],
     stressfM = 6, #per 8h
     dshape.stress = 3
   ),list(#simulation 2
@@ -28,12 +22,6 @@ paramsets <- list(
     anticipation = c("YES","NO")[2],
     stressfM = 6, #per 8h
     dshape.stress = 3
-  # ),list(#simulation 2
-  #   wakefM = 8, #per day
-  #   dshape.wake = 1.1,
-  #   anticipation = c("YES","NO")[1],
-  #   stressfM = 6, #per 8h
-  #   dshape.stress = 2
     )
 )
 
@@ -45,8 +33,8 @@ defaults <- list( #initialize list
   
   ## simulation settings
   fs = 2, #samples per hour
-  days = 2,
-  people = 1000,
+  days = 200,
+  people = 10000,
   integration = "RK4",
   
   #awakening impulse
@@ -69,6 +57,8 @@ defaults <- list( #initialize list
   halftimeSD = 8/60 #between person variation
 )
 
+samplepersons = sample(defaults$people, 4)
+
 #### 1 LOAD PACKAGES & SET DIRECTORY #####
 
 start.time = Sys.time()
@@ -84,15 +74,15 @@ package("dplyr")
 package("tidyr")
 package("ggplot2")
 package("tcltk")
-package("car")
+#package("car")
 package("rmarkdown")
 package("knitr")
 
 
 
 #checks if a dedicated data output folder is available in the working directory and, if not, ask the user to define the directory
-winDir <- "D/Surfdrive/BS28A - Major project/simulations"
-macDir <- "/Users/remcobenthemdegrave/surfdrive/BS28A - Major project/simulations"
+winDir <- "C:/Users/b8058356/OneDrive - Newcastle University/Courses and learning/BS28A - Major project/simulations"
+macDir <- "/Users/remcobenthemdegrave/OneDrive - Newcastle University/Courses and learning/BS28A - Major project/simulations"
 if (file.exists(winDir)){setwd(winDir)}; if (file.exists(macDir)){setwd(macDir)}; 
 if (!file.exists("simoutput")){setwd(tk_choose.dir(getwd(), "Choose folder for storing simulation data"))
   if (!file.exists("simoutput")){dir.create("simoutput")}} 
@@ -207,8 +197,16 @@ dosim <- function(settings, simperson, n, subDir){
   set.seed(n+1e6)
   fstress <- rpois(settings$days, simperson$stressfM_pp)
   
-  #create a vector with probability values that HPA activity will occur at any possible sample
+  #create a vector counts of impulses at each specific time sample
   HPA <- stack(as.data.frame(sapply(seq(settings$days), function(day) makeHPA(day, fwake[day], fstress[day], settings,n=n+simperson$simperson*day))))[,1]
+  
+  ##########save some data for creating example plots########
+  if (simperson$simperson %in% samplepersons){
+    write.csv(HPA[1:(48*settings$fs)], file = paste0("simoutput/samples/impulses_2days_",simperson$simperson,".csv"))
+    write.csv(fwake, file = paste0("simoutput/samples/fnight_",simperson$simperson,".csv"))
+    write.csv(fstress, file = paste0("simoutput/samples/fwork_",simperson$simperson,".csv"))
+  }
+  ###########################################################
   
   ## calculate cortisol
   return(HPAA(HPA, settings$fs, settings$delay, simperson$halftime_pp, settings$integration))

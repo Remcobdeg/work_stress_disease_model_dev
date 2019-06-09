@@ -254,6 +254,8 @@ densgraph <- function(ddir){
   #read data that contains impulse frequencies per person
   simpopulation <- read.csv(file.path(ddir,"simpopulation.csv"))[,-c(1,2,3,6,7,8,9)]
   
+  if(names(simpopulation) == c("wakefM_pp","stressfM_pp")){names(simpopulation) <- c("night.f.mean_pp","work.f.mean_pp")}
+  
   #plot correlation between work impulses and night impulses
   ggplot(simpopulation, aes(x=night.f.mean_pp,y=work.f.mean_pp)) + geom_point() + 
     labs(x="night impulses",y="work impulses") + theme_minimal()
@@ -396,7 +398,8 @@ indivplots <- function(ddir){
   multiplot(plotlist = graphs, cols = 2)
 }
 
-l_ply(datadir, function(i) indivplots(i))
+#l_ply(datadir, function(i) indivplots(i))
+indivplots(datadir[14])
 ```
 
 #### Sample of seven days showing variation on all model variables from 5 random simulated people
@@ -418,7 +421,9 @@ sampleplots <- function(ddir){
   plotsample=gather(plotsample, key = "type", value = "value", -c(time,simperson))
   
   #make sure that the order is kept and asign labels
-  plotsample$type <- factor(plotsample$type, levels=c("HPA", "C", "L","A","D"), labels=c("Impulses", "Cortisol", "Elastic load","Allostatic load","Diseased"), ordered=TRUE)
+  plotsample$type <- factor(plotsample$type, levels=c("HPA", "C", "L","A","D"), labels=c("Impulses", "Cortisol", "Allostatic strain","Allostatic load","Diseased"), ordered=TRUE)
+  
+  #write.csv(plotsample, "data_figure8_example_variable_variation.csv", col.names = F)
   
   #plot
   ggplot(plotsample, aes(x=time, y=value)) +
@@ -428,6 +433,9 @@ sampleplots <- function(ddir){
 
 #plot samples per simulation
 lapply(datadir, function(ddir) sampleplots(ddir))
+# ddir = (datadir[14])
+# sampleplots(ddir)
+# ggsave("sampleplots.pdf")
 ```
 
 
@@ -533,27 +541,30 @@ if(length(datadir)>1 & sum(c('rho.E','eps.A','eps.D') %in% names(paramsets[[1]])
     load(file.path(ddir,"settings.Rdata"))
   
     odds <- ldply(unique(daydata$days), function(day) getodds(subset(daydata, days==day)))
-    odds$rho.E <- rep(settings$rho.E, nrow(odds))
-    odds$eps.A <- rep(settings$eps.A, nrow(odds))
-    odds$eps.D <- rep(settings$eps.D, nrow(odds))
+    odds$rhoE <- rep(settings$rho.E, nrow(odds))
+    odds$epsA <- rep(settings$eps.A, nrow(odds))
+    odds$epsD <- rep(settings$eps.D, nrow(odds))
   
     return(odds)
   }
   
   #combine the odds rations from all simulations
   odds_all<-ldply(datadir, function(ddir) getodds_all(ddir))
-  odds_all$rho.E<-as.factor(odds_all$rho.E) # label = c(paste(expression(rho[E]*' = .3')),paste(expression(rho[E]*' = .6')),paste(expression(rho[E]*' = .9'))))
-  odds_all$eps.A<-as.factor(odds_all$eps.A)
-  odds_all$eps.D<-as.factor(odds_all$eps.D)
+  odds_all$rhoE<-as.factor(odds_all$rhoE) # label = c(paste(expression(rho[R]*' = .3')),paste(expression(rho[R]*' = .6')),paste(expression(rho[R]*' = .9'))))
+  odds_all$epsA<-as.factor(odds_all$epsA)
+  odds_all$epsD<-as.factor(odds_all$epsD)
   
   #truncate the values to show max 100, for visibility reasons
   for (type in c('OR','lower','upper')){odds_all[[type]] <- sapply(odds_all[[type]], function(i) min(i,100))}
 
+#write.csv(odds_all, 'data_figure9b_odds_withanti.csv', col.names = F)
+  
 #plot odds ratio's
-ggplot(odds_all, aes(y= OR, x = day, shape = eps.D)) +
+ggplot(odds_all, aes(y= OR, x = day, shape = epsD)) +
   geom_point() +
   geom_errorbar(aes(ymin=lower, ymax=upper), width=.2) +
-  facet_grid(eps.A ~ rho.E, labeller = label_bquote(rows = rho[E] == .(.9), cols = epsilon['A'] == .(30))) +
+  facet_grid(epsA ~ rhoE, labeller = label_bquote(rows = rho['R'] == .(.9), cols = epsilon['A'] == .(30))) +
+  #facet_grid(epsA ~ rhoE, labeller = label_bquote(rows = rho['R'] == .(rhoE, 1, 3), cols = epsilon['A'] == .(epsA, 3, 1))) +
   geom_hline(yintercept = 1, linetype=2) +
   #coord_flip() +
   coord_trans(y="log10") +
@@ -561,11 +572,12 @@ ggplot(odds_all, aes(y= OR, x = day, shape = eps.D)) +
   scale_y_continuous(breaks=c(1, 10, 100),minor_breaks=c(seq(1,10,1),seq(20,100,10))) + # Ticks 
   scale_x_continuous(breaks=odds_all$day) +
   scale_shape_discrete(name=expression(epsilon['D'])) +
-  #labs(title = expression('Relative disease risk - split by value of '*epsilon['A']*' (horizontal) and '*rho['E']*' (vertical)'), x = "Day", y = "Relative disease risk") +
+  #labs(title = expression('Relative disease risk - split by value of '*epsilon['A']*' (horizontal) and '*rho['R']*' (vertical)'), x = "Day", y = "Relative disease risk") +
   labs(x = "Day", y = "Relative disease risk") +
   theme_minimal() + theme(legend.position="bottom")
 
-ggsave('odds_no_ant.png', width = 12.5, height = 10, units = "cm")
+#ggsave('odds_no_ant.png', width = 12.5, height = 10, units = "cm")
+#ggsave('odds_no_ant.pdf', width = 12.5, height = 10, units = "cm")
     
   
     # #assess assumptions
@@ -623,23 +635,37 @@ if(length(datadir)>1){#only if it concerns multiple simulations
   makeoddsplot2 <- function(daydataall,sim1){  
     odds <- ldply(unique(daydataall$sim.nr), function(sim2) getodds2(daydataall[which(daydataall$sim.nr %in% c(sim1,sim2)),]))
     row.names(odds)<-paste0("vs.sim.",seq_along(row.names(odds)))
-    odds$versus<-seq_along(row.names(odds))
+    odds$versus<-factor(seq_along(row.names(odds))) 
+    # odds$versus<-factor(c(7:18,1:6), labels = c("30h - config. 1                        ", "30h - config. 2                        ", "30h - config. 3                        ", "30h - config. 4                        ", "30h - config. 5                        ", "30h - config. 6                        ","40h - config. 1                        ", "40h - config. 2                        ", "40h - config. 3                        ", "40h - config. 4                        ", "40h - config. 5                        ", "40h - config. 6                        ","50h - config. 1                        ", "50h - config. 2                        ", "50h - config. 3                        ", "50h - config. 4                        ", "50h - config. 5                        ", "50h - config. 6                        ")) #TEMP CHANGE
     
     print(kable(odds))
 
+    write.csv(odds, 'suppl_odds_workvariations_9.csv', row.names = F)
     
-    #create plot of odds ratio's
-    p <- ggplot(odds, aes(y= OR, x = versus)) +
+    # #create plot of odds ratio's
+    # p <- ggplot(odds, aes(y= OR, x = versus)) +
+    #   geom_point() +
+    #   geom_errorbar(aes(ymin=lower, ymax=upper), width=.2) +
+    #   geom_hline(yintercept = 1, linetype=2) +
+    #   #coord_flip() + 
+    #   coord_trans(y="log2") +
+    #   scale_x_continuous(breaks=odds$versus) +
+    #   labs(x = paste(sim1,"versus sim..."), y = "stress, standardized") +
+    #   theme_bw() + theme(axis.title.x = element_blank())
+    # 
+    # return(p)
+    
+    #create plot of odds ratio's and print immediately
+    ggplot(odds, aes(y= OR, x = versus)) +
       geom_point() +
       geom_errorbar(aes(ymin=lower, ymax=upper), width=.2) +
       geom_hline(yintercept = 1, linetype=2) +
       #coord_flip() + 
       coord_trans(y="log2") +
-      scale_x_continuous(breaks=odds$versus) +
-      labs(x = paste(sim1,"versus sim..."), y = "stress, standardized") +
-      theme_bw() + theme(axis.title.x = element_blank())
-    
-    return(p)
+      #scale_x_continuous(breaks=odds$versus) +
+      scale_y_continuous(breaks=c(seq(.1,1,.1),seq(1,5,1))) +
+      labs(x = paste(sim1,"versus sim..."), y = "relative risk of disease") +
+      theme_bw() + theme(axis.title.x = element_blank()) + theme(axis.text.x = element_text(angle = 60))
     }
   
   #read data which contains information on whether or not are sick at the end of the simulation
@@ -650,13 +676,19 @@ if(length(datadir)>1){#only if it concerns multiple simulations
   names(daydataall)<-paste("sim",seq_along(datadir))
   daydataall<-gather(daydataall, key = sim.nr, value = sick)
   
-  #execute functions to create the odds plots
-  graphs <- lapply(unique(daydataall$sim.nr), function(sim1) makeoddsplot2(daydataall,sim1))
+  # #execute functions to create the odds plots
+  # graphs <- lapply(unique(daydataall$sim.nr), function(sim1) makeoddsplot2(daydataall,sim1))
+  # 
+  # #multiplot(plotlist = graphs,cols = 3)
+  # e=6 #start a new multiplot frame after each 4 plots
+  # l_ply(seq(1,length(graphs),e), function(i) 
+  # multiplot(plotlist = graphs[i:ifelse(i+e-1<length(graphs),i+e-1,length(graphs))], cols = 3))
   
-  #multiplot(plotlist = graphs,cols = 3)
-  e=6 #start a new multiplot frame after each 4 plots
-  l_ply(seq(1,length(graphs),e), function(i) 
-  multiplot(plotlist = graphs[i:ifelse(i+e-1<length(graphs),i+e-1,length(graphs))], cols = 3))
+  #run only to compare with the first plot
+  makeoddsplot2(daydataall,"sim 1")
+  #ggsave("worktimevar.pdf", width = 16, height = 12, units = "cm")
+  #ggsave("worktimevar.png", width = 16, height = 12, units = "cm")
+
 
 } else{print('NA')}
 ```
@@ -688,10 +720,12 @@ if(length(datadir)>1 & sum(c('rho.E','eps.A','eps.D') %in% names(paramsets[[1]])
     return(daydata)}
   
   #here the data from the various simulations are combined
-  daydataall <- ldply(datadir, function(ddir) get_aload(ddir))
+  aloadtrend <- ldply(datadir, function(ddir) get_aload(ddir))
+  
+  #write.csv(aloadtrend, "suppl_aloadtrend_noanti.csv", col.names = F)
   
   #plot the distributions of allostatic load - note that variation in disease threshold (eps.D) does not interest us at this point, therefore we only choose only one value of eps.D to plot. Also we standardize stressor frequencies
-  ggplot(subset(daydataall, days == max(days) & eps.D == unique(eps.D)[1]), aes(x=scale(work.f.mean)[,1], y=Aload)) +
+  ggplot(subset(aloadtrend, days == max(days) & eps.D == unique(eps.D)[1]), aes(x=scale(work.f.mean)[,1], y=Aload)) +
     geom_point() + geom_smooth(method="lm", se=F, colour="red") +
     facet_grid(rho.E ~ eps.A, scales="free") + 
     labs(x = "individual average work stressors (standardized)", y = "Allostatic load") +
@@ -722,9 +756,11 @@ if(length(datadir)>1 & sum(c('rho.E','eps.A','eps.D') %in% names(paramsets[[1]])
     return(daydata)}
   
   #combine the data of the different simulations
-  daydataall <- ldply(datadir, function(ddir) get_sick_profiles(ddir))
+  aloadtrend_sick100 <- ldply(datadir, function(ddir) get_sick_profiles(ddir))
   
-  ggplot(daydataall, aes(x=days, y=Aload, color = simperson)) +
+  #write.csv(aloadtrend_sick100, "suppl_aloadtrend_sick100_noanti.csv", col.names = F)
+
+  ggplot(aloadtrend_sick100, aes(x=days, y=Aload, color = simperson)) +
     geom_line() + facet_grid(rho.E ~ eps.A) + 
     labs(title = 'allostatic load growth curves of 100 people becoming diseases', x = 'time [days]', y = "Allostatic load") + theme_bw() + theme(legend.position="none")  
 }

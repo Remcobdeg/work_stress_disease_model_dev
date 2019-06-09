@@ -21,41 +21,284 @@ rm(list = ls()) #clear the environment
 
 paramsets <- list(
   list(#simulation 1
-    worktime = c(9,9+30/5),
+    eps.A = 10,  
+    rho.E = .3, 
+    worktime = c(9,9+40/5),
     dayoff = c(0,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 2
-    worktime = c(9,9+30/5),
+    eps.A = 10,  
+    rho.E = .3, 
+    worktime = c(9,9+40/5),
     dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 3
-    worktime = c(9,9+30/4),
+    eps.A = 10,  
+    rho.E = .3, 
+    worktime = c(9,9+40/4),
     dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 4
-    worktime = c(9,9+30/3),
+    eps.A = 10,  
+    rho.E = .3, 
+    worktime = c(9,9+40/3),
     dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 5
-    worktime = c(9,9+30/6),
+    eps.A = 10,  
+    rho.E = .3, 
+    worktime = c(9,9+40/6),
     dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 6
-    worktime = c(9,9+30/7),
-    dayoff = c() #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    eps.A = 10,  
+    rho.E = .3, 
+    worktime = c(9,9+40/7),
+    dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+
   ),list(#simulation 7
-    worktime = c(9,9+50/5),
-    dayoff = c(0,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    eps.A = 10,  
+    rho.E = .6, 
+    worktime = c(9,9+40/5),
+    dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 8
-    worktime = c(9,9+50/5),
+    eps.A = 10,  
+    rho.E = .6, 
+    worktime = c(9,9+40/5),
     dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 9
-    worktime = c(9,9+50/4),
+    eps.A = 10,  
+    rho.E = .6, 
+    worktime = c(9,9+40/4),
     dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 10
-    worktime = c(9,9+50/3),
+    eps.A = 10,  
+    rho.E = .6, 
+    worktime = c(9,9+40/3),
     dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 11
-    worktime = c(9,9+50/6),
+    eps.A = 10,  
+    rho.E = .6, 
+    worktime = c(9,9+40/6),
     dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
   ),list(#simulation 12
-    worktime = c(9,9+50/7),
-    dayoff = c() #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    eps.A = 10,  
+    rho.E = .6, 
+    worktime = c(9,9+40/7),
+    dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    
+  ),list(#simulation 13
+    eps.A = 10,  
+    rho.E = .9, 
+    worktime = c(9,9+40/5),
+    dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+  ),list(#simulation 8
+    eps.A = 10,  
+    rho.E = .9, 
+    worktime = c(9,9+40/5),
+    dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+  ),list(#simulation 9
+    eps.A = 10,  
+    rho.E = .9, 
+    worktime = c(9,9+40/4),
+    dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+  ),list(#simulation 10
+    eps.A = 10,  
+    rho.E = .9, 
+    worktime = c(9,9+40/3),
+    dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+  ),list(#simulation 11
+    eps.A = 10,  
+    rho.E = .9, 
+    worktime = c(9,9+40/6),
+    dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+  ),list(#simulation 18
+    eps.A = 10,  
+    rho.E = .9, 
+    worktime = c(9,9+40/7),
+    dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+
+  ),list(#simulation 19
+      eps.A = 20,  
+      rho.E = .3, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 2
+      eps.A = 20,  
+      rho.E = .3, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 3
+      eps.A = 20,  
+      rho.E = .3, 
+      worktime = c(9,9+40/4),
+      dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 4
+      eps.A = 20,  
+      rho.E = .3, 
+      worktime = c(9,9+40/3),
+      dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 5
+      eps.A = 20,  
+      rho.E = .3, 
+      worktime = c(9,9+40/6),
+      dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 24
+      eps.A = 20,  
+      rho.E = .3, 
+      worktime = c(9,9+40/7),
+      dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+      
+    ),list(#simulation 25
+      eps.A = 20,  
+      rho.E = .6, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 8
+      eps.A = 20,  
+      rho.E = .6, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 9
+      eps.A = 20,  
+      rho.E = .6, 
+      worktime = c(9,9+40/4),
+      dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 10
+      eps.A = 20,  
+      rho.E = .6, 
+      worktime = c(9,9+40/3),
+      dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 11
+      eps.A = 20,  
+      rho.E = .6, 
+      worktime = c(9,9+40/6),
+      dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 30
+      eps.A = 20,  
+      rho.E = .6, 
+      worktime = c(9,9+40/7),
+      dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+      
+    ),list(#simulation 31
+      eps.A = 20,  
+      rho.E = .9, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 8
+      eps.A = 20,  
+      rho.E = .9, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 9
+      eps.A = 20,  
+      rho.E = .9, 
+      worktime = c(9,9+40/4),
+      dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 10
+      eps.A = 20,  
+      rho.E = .9, 
+      worktime = c(9,9+40/3),
+      dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 11
+      eps.A = 20,  
+      rho.E = .9, 
+      worktime = c(9,9+40/6),
+      dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 36
+      eps.A = 20,  
+      rho.E = .9, 
+      worktime = c(9,9+40/7),
+      dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+      
+    ),list(#simulation 37
+      eps.A = 30,  
+      rho.E = .3, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 2
+      eps.A = 30,  
+      rho.E = .3, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 3
+      eps.A = 30,  
+      rho.E = .3, 
+      worktime = c(9,9+40/4),
+      dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 4
+      eps.A = 30,  
+      rho.E = .3, 
+      worktime = c(9,9+40/3),
+      dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 5
+      eps.A = 30,  
+      rho.E = .3, 
+      worktime = c(9,9+40/6),
+      dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 42
+      eps.A = 30,  
+      rho.E = .3, 
+      worktime = c(9,9+40/7),
+      dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+      
+    ),list(#simulation 43
+      eps.A = 30,  
+      rho.E = .6, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 8
+      eps.A = 30,  
+      rho.E = .6, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 9
+      eps.A = 30,  
+      rho.E = .6, 
+      worktime = c(9,9+40/4),
+      dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 10
+      eps.A = 30,  
+      rho.E = .6, 
+      worktime = c(9,9+40/3),
+      dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 11
+      eps.A = 30,  
+      rho.E = .6, 
+      worktime = c(9,9+40/6),
+      dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 48
+      eps.A = 30,  
+      rho.E = .6, 
+      worktime = c(9,9+40/7),
+      dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+      
+    ),list(#simulation 49
+      eps.A = 30,  
+      rho.E = .9, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 8
+      eps.A = 30,  
+      rho.E = .9, 
+      worktime = c(9,9+40/5),
+      dayoff = c(0,3) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 9
+      eps.A = 30,  
+      rho.E = .9, 
+      worktime = c(9,9+40/4),
+      dayoff = c(0,3,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 10
+      eps.A = 30,  
+      rho.E = .9, 
+      worktime = c(9,9+40/3),
+      dayoff = c(0,3,5,6) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 11
+      eps.A = 30,  
+      rho.E = .9, 
+      worktime = c(9,9+40/6),
+      dayoff = c(0) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+    ),list(#simulation 54
+      eps.A = 30,  
+      rho.E = .9, 
+      worktime = c(9,9+40/7),
+      dayoff = c(NULL) #from 0-6: 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
+      
   ))
 
 
@@ -125,7 +368,7 @@ package("knitr")
 ## set saving directories
 
 #checks if a dedicated data output folder is available in the working directory and, if not, ask the user to define the directory
-winDir <- "D/Surfdrive/BS28A - Major project/simulations"
+winDir <- "C:/Users/b8058356/OneDrive - Newcastle University/Courses and learning/BS28A - Major project/simulations/simoutput/samples/"
 macDir <- "/Users/remcobenthemdegrave/OneDrive - Newcastle University/Courses and learning/BS28A - Major project/simulations"
 if (file.exists(winDir)){setwd(winDir)}; if (file.exists(macDir)){setwd(macDir)}; 
 if (!file.exists("simoutput")){setwd(tk_choose.dir(getwd(), "Choose folder for storing simulation data"))

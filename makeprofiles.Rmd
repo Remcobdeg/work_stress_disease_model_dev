@@ -226,6 +226,37 @@ l_ply(seq(1,length(graphs),e), function(i)
   multiplot(plotlist = graphs[i:ifelse(i+e-1<length(graphs),i+e-1,length(graphs))], cols = 2))
 ```
 
+```{r}
+#### graph of correlation work and night impulses ####
+
+for (ddir in datadir){
+  
+  load(file.path(ddir,"simpopulation.Rdata"))
+  load(file.path(ddir,"settings.Rdata"))
+  
+  names(simpopulation) = c('simperson', 'halflife_pp', 'night.f.mean_pp', 'work.f.mean_pp')
+  
+  #scale work impulses / 8h to actual worked hours / day
+  simpopulation$work.f.mean_pp = simpopulation$work.f.mean_pp * 
+    (settings$worktime[[2]]-settings$worktime[[1]])/8 
+  
+  #in case of anticipation, add work impulses to (independent) night impulses to create new night impulses
+  simpopulation$night.f.mean_pp = simpopulation$night.f.mean_pp + (settings$anticipation == "YES") *
+    simpopulation$work.f.mean_pp
+  
+  #plot correlation between work impulses and night impulses
+  ggplot(simpopulation, aes(x=night.f.mean_pp,y=work.f.mean_pp)) + geom_point() +
+    labs(x="night impulses",y="work impulses") + theme_minimal()
+  
+  #write.csv(simpopulation[,-2], "data_figure4b_impulses_correlation_anticipation.csv", row.names = F)
+
+}
+
+
+
+```
+
+
 
 ##### Cohort data Miller et al. (2017).
 ![](Millergraph.png)
@@ -261,9 +292,17 @@ makeQgraph <- function(ddir){#first create plot of quantiles since awakening, as
   #scale to level of Miller
   Qdata$cortisol<-Qdata$cortisol*settings$kHPA
   
+  ## store data for report
+  # use only data from awakening until 16h after awakening
+  wakeprofiledata <- subset(Qdata, time>=settings$waketime & time<=settings$waketime + 16)
+  # adjust the time to 'hours after awakening'
+  wakeprofiledata$time <- wakeprofiledata$time - settings$waketime
+  #write.csv(wakeprofiledata, "suppl_cort_profile_no_anticipation.csv", row.names = F)
+  
+  
    #plot profiles since awakening
-  pa<- ggplot(subset(Qdata, time>=settings$waketime), aes(x=time-settings$waketime,y=cortisol,group=quantile)) + 
-  geom_line(aes(linetype=quantile)) + 
+  pa<- ggplot(wakeprofiledata, aes(x=time,y=cortisol,group=quantile)) + 
+    geom_line(aes(linetype=quantile)) + 
     scale_linetype_manual(values=c("dotted","twodash","solid","twodash","dotted"),
                           name="Percentile",
                           breaks=c("Q90", "Q75", "Q50", "Q25", "Q10"),
@@ -271,7 +310,7 @@ makeQgraph <- function(ddir){#first create plot of quantiles since awakening, as
     scale_x_continuous(breaks=seq(0, 20, 2)) +
     labs(x="time since awakening", y="simulated cortisol [arbitrary units]") +
     theme_minimal() + theme(legend.justification=c(1,1), legend.position=c(1,1), panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank()) +
-    coord_cartesian(xlim=c(0,20) ,ylim=c(0, 19))
+    coord_cartesian(xlim=c(0,16) ,ylim=c(0, 19))
     
   # #plot profiles since awakening
   # pa<- ggplot(subset(Qdata, time>=settings$waketime & time<= settings$waketime+21), aes(x=time-settings$waketime,y=cortisol,group=quantile)) + 
@@ -297,12 +336,17 @@ makeQgraph <- function(ddir){#first create plot of quantiles since awakening, as
   Qdata$C<-Qdata$C*settings$kHPA
 
   #calculate mean and standard 95%-CI of the group data
-  nightdata <- data.frame(
+  nightprofiledata <- data.frame(
     time = unique(Qdata$time),
     M = sapply(unique(Qdata$time), function(t) mean(Qdata$C[which(Qdata$time==t)])),
     SE = sapply(unique(Qdata$time), function(t) sd(Qdata$C[which(Qdata$time==t)])/sqrt(settings$people)))
+  
+  #use same subset as in Clow et al. 
+  nightprofiledata <- subset(nightprofiledata, time<=settings$waketime+3 & time>=settings$waketime-6)
+  
+  #write.csv(nightprofiledata, "suppl_night_profile_no_anticipation.csv", row.names = F)
 
-  pn<-ggplot(subset(nightdata, time<=settings$waketime+3 & time>=settings$waketime-6),  aes(x=time,y=M,ymin=M-2*SE,ymax=M+2*SE)) + 
+  pn<-ggplot(nightprofiledata,  aes(x=time,y=M,ymin=M-2*SE,ymax=M+2*SE)) + 
     geom_line() + 
     geom_ribbon(alpha=0.2) +
     geom_vline(xintercept = 7, linetype=2, color="grey") +
@@ -326,7 +370,8 @@ makeQgraph <- function(ddir){#first create plot of quantiles since awakening, as
 #makegraphs
 graphs<-sapply(datadir, function(i) makeQgraph(i))
 #restructure the 3 different graph types in sub-lists 
-graphs<-lapply(seq(3), function(i) graphs[seq(i,length(graphs),3)])
+#graphs<-
+  lapply(seq(3), function(i) graphs[seq(i,length(graphs),3)])
 ```
 
 ##### Average cortisol profiles since awakening
@@ -354,7 +399,7 @@ l_ply(seq(1,length(graphs[[3]]),e), function(i)
 ##Appendix
 
 ```{r, echo = FALSE, warning = FALSE}
-
+# create 10 random 24h sample cortisol profiles (comparison with Hosseinichimeh)
 sampleplots <- function(ddir){
   
   rm(Qdata)
@@ -365,34 +410,40 @@ sampleplots <- function(ddir){
   load(file.path(ddir,"settings.Rdata"))
 
   #randomly pick some people to plot
-  set.seed(2)
-  Qdata=Qdata[which(Qdata$person %in% sample(unique(Qdata$person),10)),]
+  set.seed(7)
+  sampleprofiles=Qdata[which(Qdata$person %in% sample(unique(Qdata$person),10)),]
+  
+  #only use 24h
+  sampleprofiles <- subset(sampleprofiles, time <= 24)
   
   #scale cortisol values as done for the profile graphs of the group averages 
-  Qdata$C<-Qdata$C*settings$kHPA
+  sampleprofiles$C<-sampleprofiles$C*settings$kHPA
   
   #change description of the persons
-  Qdata$person <- gsub("V", "person ", Qdata$person)
-  Qdata$person <- factor(Qdata$person)
+  sampleprofiles$person <- gsub("V", "person ", sampleprofiles$person)
+  sampleprofiles$person <- factor(sampleprofiles$person)
   
-  #
-  pp <- ggplot(subset(Qdata, time <= 24), aes(x=time, y=C, group = person)) +
-    geom_line() + facet_wrap(~ person, ncol = 2) +
-    labs(x="time [hours]", y=expression("Simulated cortisol [arbitrary units]")) +
-    theme_minimal() + theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank())
-    scale_x_continuous(breaks=seq(0, 24, 4)) 
+  names(sampleprofiles) = c("time","person","cortisol")
+  
+  write.csv(sampleprofiles, "data_figure7c_24hsample_anticipation.csv", row.names = F)
+  
+  # #
+  # pp <- ggplot(subset(Qdata, time <= 24), aes(x=time, y=C, group = person)) +
+  #   geom_line() + facet_wrap(~ person, ncol = 2) +
+  #   labs(x="time [hours]", y=expression("Simulated cortisol [arbitrary units]")) +
+  #   theme_minimal() + theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank())
+  #   scale_x_continuous(breaks=seq(0, 24, 4)) 
   
   
   #plot individual cortisol profiles of only the first day for comparison with Hosseinichimeh 2015
   individual <- function(data){
-    ggplot(subset(data, time <= 24), aes(x=time, y=C)) + geom_line() + 
+    ggplot(subset(data, time <= 24), aes(x=time, y=cortisol)) + geom_line() + 
     scale_x_continuous(breaks=seq(0, 24, 4)) +
     ylab("Simulated cortisol") + xlab("time [hours]") +
     theme_minimal() + theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank())
-
   }
   
-  graphs <- lapply(unique(Qdata$person), function(person) individual(Qdata[which(Qdata$person == person),]))
+  graphs <- lapply(unique(sampleprofiles$person), function(person) individual(sampleprofiles[which(sampleprofiles$person == person),]))
 
   return(graphs)
 }
@@ -404,7 +455,7 @@ sampleplots <- function(ddir){
 ##### 24h cortisol profiles of 17 individuals from Hosseinichimeh et al. (2015).
 ![](individuals-hosseinichimeh.png)
 
-##### 24h cortisol profiles from 5 randomly selected people
+##### 24h cortisol profiles from 10 randomly selected people
 ```{r, echo = FALSE, message = FALSE, warning = FALSE}
 
 l_ply(datadir, function(i) multiplot(plotlist = sampleplots(i), cols = 4))
